@@ -37,32 +37,33 @@ export default function ProfileDetailScreen() {
 	const emojis = ["😺", "🐶", "🐸", "🐵", "🦊", "🐰", "🐨", "🦄", "🐼", "🐷"];
 	const greenColor = "#87B56C";
 
-	useEffect(() => {
-		const loadUser = async () => {
-			const storedUser = await SecureStore.getItemAsync("user");
-			const storedGender = await SecureStore.getItemAsync("gender");
-			if (storedUser) {
-				const parsed = JSON.parse(storedUser);
-				const randomNum = Math.floor(10000 + Math.random() * 90000);
-				const userId = `24${randomNum}`;
+useFocusEffect(
+  useCallback(() => {
+    const loadUser = async () => {
+      const storedUser = await SecureStore.getItemAsync("user");
+      const storedGender = await SecureStore.getItemAsync("gender");
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        setUserInfo({
+          name: parsed.name || "",
+          email: parsed.email || "",
+          userId: parsed._id || "",
+          gender: storedGender || "Other",
+          avatar: parsed.avatar || "😺",
+        });
+      }
+    };
 
-				if (!parsed._id) {
-					const updatedUser = { ...parsed, _id: userId };
-					await SecureStore.setItemAsync("user", JSON.stringify(updatedUser));
-				}
+    const fetchLinkedAccount = async () => {
+      const linked = await SecureStore.getItemAsync("linkedBankAccount");
+      if (linked) setLinkedAccount(JSON.parse(linked));
+      else setLinkedAccount(null);
+    };
 
-				setUserInfo({
-					name: parsed.name || "",
-					email: parsed.email || "",
-					userId: parsed._id || userId,
-					gender: storedGender || "Other",
-					avatar: parsed.avatar || "😺",
-				});
-			}
-		};
-
-		loadUser();
-	}, []);
+    loadUser();
+    fetchLinkedAccount();
+  }, [])
+);
 
 	useFocusEffect(
 		useCallback(() => {
@@ -90,6 +91,25 @@ export default function ProfileDetailScreen() {
 			{
 				text: "Yes",
 				onPress: async () => {
+					const confirmEdit = async () => {
+  if (!tempValue.trim()) return; // prevent empty nickname
+
+  // Update userInfo state
+  setUserInfo((prev) => ({ ...prev, name: tempValue }));
+
+  // Load current stored user
+  const storedUser = await SecureStore.getItemAsync("user");
+  if (storedUser) {
+    const parsed = JSON.parse(storedUser);
+    // Update name
+    parsed.name = tempValue;
+    // Save updated user back to SecureStore
+    await SecureStore.setItemAsync("user", JSON.stringify(parsed));
+  }
+
+  setEditingField(null);
+};
+
 					// Deleting known keys individually
 					await SecureStore.deleteItemAsync("user");
 					await SecureStore.deleteItemAsync("gender");
@@ -99,17 +119,21 @@ export default function ProfileDetailScreen() {
 			},
 		]);
 	};
+const confirmEdit = async () => {
+  if (!tempValue.trim()) return;
 
-	const confirmEdit = () => {
-		if (editingField) {
-			setUserInfo((prev) => ({
-				...prev,
-				[editingField === "nickname" ? "name" : "userId"]: tempValue,
-			}));
-			setEditingField(null);
-			setTempValue("");
-		}
-	};
+  setUserInfo((prev) => ({ ...prev, name: tempValue }));
+
+  const storedUser = await SecureStore.getItemAsync("user");
+  if (storedUser) {
+    const parsed = JSON.parse(storedUser);
+    parsed.name = tempValue;
+    await SecureStore.setItemAsync("user", JSON.stringify(parsed));
+  }
+
+  setEditingField(null);
+};
+
 
 	const confirmAvatar = (emoji: string) => {
 		setUserInfo((prev) => ({ ...prev, avatar: emoji }));
