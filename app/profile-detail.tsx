@@ -13,9 +13,8 @@ import {
 	Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
-import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useFocusEffect } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
@@ -29,7 +28,6 @@ export default function ProfileDetailScreen() {
 		gender: "Other",
 		avatar: "😺",
 	});
-	const [editingGender, setEditingGender] = useState(false);
 	const [editingField, setEditingField] = useState<null | "nickname" | "id">(null);
 	const [tempValue, setTempValue] = useState("");
 	const [avatarModalVisible, setAvatarModalVisible] = useState(false);
@@ -79,7 +77,7 @@ export default function ProfileDetailScreen() {
 
 	const handleGenderChange = async (value: string) => {
 		setUserInfo((prev) => ({ ...prev, gender: value }));
-		await SecureStore.setItem("gender", value);
+		await SecureStore.setItemAsync("gender", value);
 		setGenderModalVisible(false);
 	};
 
@@ -92,8 +90,11 @@ export default function ProfileDetailScreen() {
 			{
 				text: "Yes",
 				onPress: async () => {
-					await SecureStore.clear();
-					router.replace("/loginscreen");
+					// Deleting known keys individually
+					await SecureStore.deleteItemAsync("user");
+					await SecureStore.deleteItemAsync("gender");
+					await SecureStore.deleteItemAsync("linkedBankAccount");
+					router.replace("/login");// made the screen navigated to login instead of the forgot password page.
 				},
 			},
 		]);
@@ -116,7 +117,10 @@ export default function ProfileDetailScreen() {
 	};
 
 	const confirmDeleteAccount = async () => {
-		await SecureStore.clear();
+		// Delete known keys individually and delete all the values under those buttons making the delete button work properly
+		await SecureStore.deleteItemAsync("user");
+		await SecureStore.deleteItemAsync("gender");
+		await SecureStore.deleteItemAsync("linkedBankAccount");
 		router.replace("/loginscreen");
 	};
 
@@ -258,50 +262,46 @@ export default function ProfileDetailScreen() {
 					onPress={() => router.push("/profile")}
 					style={styles.navItem}
 				>
-					<Ionicons
-						name="person-outline"
-						size={26}
-						color="#87B56C"
+					<Image
+						source={require("../assets/icons/profile.png")}
+						style={styles.navIcon}
 					/>
-					<Text style={[styles.navLabel, { color: "#87B56C" }]}>Me</Text>
+					<Text style={styles.navLabel}>Profile</Text>
 				</TouchableOpacity>
 			</View>
 
-			{/* Edit Nickname Modal */}
+			{/* Edit Nickname/ID Modal */}
 			<Modal
-				visible={editingField !== null}
-				transparent
 				animationType="fade"
+				transparent={true}
+				visible={!!editingField}
+				onRequestClose={() => setEditingField(null)}
 			>
 				<View style={styles.modalOverlay}>
-					<View style={styles.editPopupContainer}>
+					<View style={styles.modalContainer}>
+						<Text style={styles.modalTitle}>
+							Edit {editingField === "nickname" ? "Nickname" : "ID"}
+						</Text>
 						<TextInput
-							style={[styles.textInput, { backgroundColor: "#D9D9D9" }]}
+							style={styles.textInput}
+							placeholder={editingField === "nickname" ? "Enter new nickname" : "Enter new ID"}
 							value={tempValue}
 							onChangeText={setTempValue}
-							placeholder="Enter new value"
-							placeholderTextColor="#999"
+							autoFocus={true}
 						/>
-						<View style={styles.popupButtons}>
+						<View style={styles.modalButtons}>
 							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
 								onPress={() => setEditingField(null)}
+								style={styles.cancelButton}
 							>
-								<Ionicons
-									name="close"
-									size={30}
-									color="#000"
-								/>
+								<Text style={{ color: "#000" }}>Cancel</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
 								onPress={confirmEdit}
+								style={[styles.confirmButton, { backgroundColor: greenColor }]}
+								disabled={!tempValue.trim()}
 							>
-								<Ionicons
-									name="checkmark"
-									size={30}
-									color="#000"
-								/>
+								<Text style={{ color: "#fff" }}>Confirm</Text>
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -310,111 +310,125 @@ export default function ProfileDetailScreen() {
 
 			{/* Avatar Modal */}
 			<Modal
-				visible={avatarModalVisible}
-				transparent
 				animationType="fade"
+				transparent={true}
+				visible={avatarModalVisible}
+				onRequestClose={() => setAvatarModalVisible(false)}
 			>
 				<View style={styles.modalOverlay}>
-					<View style={styles.editPopupContainer}>
+					<View style={styles.avatarModalContainer}>
+						<Text style={styles.modalTitle}>Choose Avatar</Text>
 						<FlatList
 							data={emojis}
-							numColumns={5}
 							keyExtractor={(item) => item}
+							horizontal
+							showsHorizontalScrollIndicator={false}
 							renderItem={({ item }) => (
-								<TouchableOpacity onPress={() => confirmAvatar(item)}>
-									<Text style={{ fontSize: 28, margin: 8 }}>{item}</Text>
+								<TouchableOpacity
+									style={[
+										styles.avatarItem,
+										item === userInfo.avatar && {
+											backgroundColor: "#6CC551",
+											borderWidth: 2,
+											borderColor: "#000",
+										},
+									]}
+									onPress={() => confirmAvatar(item)}
+								>
+									<Text style={{ fontSize: 36 }}>{item}</Text>
 								</TouchableOpacity>
 							)}
 						/>
-						<TouchableOpacity style={styles.uploadButton}>
+						<TouchableOpacity
+							style={styles.uploadButton}
+							onPress={() => Alert.alert("Upload feature not implemented yet")}
+						>
 							<Text style={{ color: "#000" }}>Upload from Device</Text>
 						</TouchableOpacity>
-						<View style={styles.popupButtons}>
-							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
-								onPress={() => setAvatarModalVisible(false)}
-							>
-								<Ionicons
-									name="close"
-									size={30}
-									color="#000"
-								/>
-							</TouchableOpacity>
-						</View>
+						<TouchableOpacity
+							onPress={() => setAvatarModalVisible(false)}
+							style={styles.cancelButton}
+						>
+							<Text>Cancel</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 			</Modal>
 
 			{/* Gender Modal */}
 			<Modal
-				visible={genderModalVisible}
-				transparent
 				animationType="fade"
+				transparent={true}
+				visible={genderModalVisible}
+				onRequestClose={() => setGenderModalVisible(false)}
 			>
 				<View style={styles.modalOverlay}>
-					<View style={styles.editPopupContainer}>
-						{["Male", "Female", "Other"].map((gender, index) => (
+					<View style={styles.modalContainer}>
+						<Text style={styles.modalTitle}>Select Gender</Text>
+						{["Male", "Female", "Other"].map((option) => (
 							<TouchableOpacity
-								key={gender}
-								style={[styles.genderButton, { backgroundColor: greenColor }]}
-								onPress={() => handleGenderChange(gender)}
+								key={option}
+								style={[
+									styles.genderOption,
+									userInfo.gender === option && { backgroundColor: greenColor },
+								]}
+								onPress={() => handleGenderChange(option)}
 							>
-								<Text style={{ color: "#000", fontWeight: "bold" }}>{gender}</Text>
+								<Text style={{ color: userInfo.gender === option ? "#fff" : "#000" }}>
+									{option}
+								</Text>
 							</TouchableOpacity>
 						))}
-						<Text
-							style={{ marginTop: 10, fontSize: 14, color: "#555" }}
+						<TouchableOpacity
 							onPress={() => handleGenderChange("I don't want to reveal")}
+							style={[
+								styles.genderOption,
+								userInfo.gender === "I don't want to reveal" && { backgroundColor: greenColor },
+							]}
 						>
-							I don't want to reveal
-						</Text>
-						<View style={styles.popupButtons}>
-							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
-								onPress={() => setGenderModalVisible(false)}
+							<Text
+								style={{
+									color: userInfo.gender === "I don't want to reveal" ? "#fff" : "#000",
+								}}
 							>
-								<Ionicons
-									name="close"
-									size={30}
-									color="#000"
-								/>
-							</TouchableOpacity>
-						</View>
+								I don't want to reveal
+							</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => setGenderModalVisible(false)}
+							style={styles.cancelButton}
+						>
+							<Text>Cancel</Text>
+						</TouchableOpacity>
 					</View>
 				</View>
 			</Modal>
 
-			{/* Delete Confirmation Modal */}
+			{/* Delete Account Confirmation Modal */}
 			<Modal
-				visible={deleteModalVisible}
-				transparent
 				animationType="fade"
+				transparent={true}
+				visible={deleteModalVisible}
+				onRequestClose={() => setDeleteModalVisible(false)}
 			>
 				<View style={styles.modalOverlay}>
-					<View style={styles.editPopupContainer}>
-						<Text style={{ fontSize: 16, marginBottom: 20, color: "#000", textAlign: "center" }}>
-							Do you really want to delete your account?
+					<View style={styles.modalContainer}>
+						<Text style={styles.modalTitle}>Delete Account?</Text>
+						<Text style={{ marginBottom: 20 }}>
+							Are you sure you want to delete your account? This action cannot be undone.
 						</Text>
-						<View style={styles.popupButtons}>
+						<View style={styles.modalButtons}>
 							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
 								onPress={() => setDeleteModalVisible(false)}
+								style={styles.cancelButton}
 							>
-								<Ionicons
-									name="close"
-									size={30}
-									color="#000"
-								/>
+								<Text>Cancel</Text>
 							</TouchableOpacity>
 							<TouchableOpacity
-								style={[styles.modalButton, { backgroundColor: greenColor }]}
 								onPress={confirmDeleteAccount}
+								style={[styles.confirmButton, { backgroundColor: "#FF3333" }]}
 							>
-								<Ionicons
-									name="checkmark"
-									size={30}
-									color="#000"
-								/>
+								<Text style={{ color: "#fff" }}>Delete</Text>
 							</TouchableOpacity>
 						</View>
 					</View>
@@ -425,153 +439,183 @@ export default function ProfileDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, backgroundColor: "#fff" },
-	backButton: { position: "absolute", top: 55, left: 20, zIndex: 2 },
+	container: {
+		flex: 1,
+		backgroundColor: "#cdc7c7",
+		paddingTop: 30,
+	},
+	backButton: {
+		marginLeft: 10,
+		marginBottom: 5,
+	},
 	title: {
-		paddingTop: 55,
-		fontSize: 24,
-		textAlign: "center",
+		fontSize: 28,
 		fontWeight: "bold",
-		backgroundColor: "#87B56C",
-		color: "#000",
-		paddingBottom: 15,
+		textAlign: "center",
+		marginBottom: 10,
 	},
 	scrollContainer: {
-		paddingHorizontal: 10,
-		paddingTop: 10,
+		paddingHorizontal: 15,
 	},
 	row: {
-		backgroundColor: "#ddd",
-		borderBottomWidth: 1,
-		borderBottomColor: "#aaa",
-		padding: 16,
+		backgroundColor: "#fff",
+		padding: 15,
+		borderRadius: 8,
+		marginBottom: 12,
 		flexDirection: "row",
-		justifyContent: "space-between",
 		alignItems: "center",
+		justifyContent: "space-between",
 	},
 	rowRight: {
 		flexDirection: "row",
 		alignItems: "center",
-		gap: 8,
+		gap: 10, 
 	},
 	label: {
 		fontSize: 16,
-		color: "#333",
+		color: "#444",
+		fontWeight: "bold",
 	},
 	value: {
 		fontSize: 16,
-		color: "#666",
+		color: "#444",
 	},
 	signOutButton: {
-		backgroundColor: "#6c757d",
-		marginTop: 30,
-		marginHorizontal: 40,
+		backgroundColor: "#6CC551",
 		padding: 15,
-		borderRadius: 10,
+		borderRadius: 8,
+		marginTop: 20,
 		alignItems: "center",
 	},
 	deleteButton: {
-		backgroundColor: "#d9534f",
-		marginTop: 10,
-		marginHorizontal: 40,
+		backgroundColor: "#FF3333",
 		padding: 15,
-		borderRadius: 10,
+		borderRadius: 8,
+		marginTop: 10,
 		alignItems: "center",
-		marginBottom: 50,
 	},
 	buttonText: {
 		color: "#fff",
 		fontWeight: "bold",
 		fontSize: 16,
 	},
-	modalOverlay: {
-		flex: 1,
-		backgroundColor: "rgba(0,0,0,0.6)",
-		justifyContent: "center",
-		alignItems: "center",
-	},
-	editPopupContainer: {
-		backgroundColor: "#FFFFFF",
-		borderRadius: 20,
-		padding: 20,
-		width: "85%",
-		alignItems: "center",
-	},
-	textInput: {
-		borderRadius: 10,
-		padding: 10,
-		width: "100%",
-		marginBottom: 15,
-	},
-	popupButtons: {
-		flexDirection: "row",
-		gap: 20,
-		marginTop: 15,
-	},
-	modalButton: {
-		padding: 10,
-		borderRadius: 10,
-	},
-	uploadButton: {
-		backgroundColor: "#D9D9D9",
-		borderRadius: 8,
-		padding: 10,
-		marginTop: 10,
-	},
-	genderButton: {
-		width: "100%",
-		padding: 12,
-		marginBottom: 10,
-		borderRadius: 10,
-		alignItems: "center",
-	},
 	bottomNav: {
 		flexDirection: "row",
 		justifyContent: "space-around",
-		alignItems: "center",
 		paddingVertical: 10,
-		backgroundColor: "white",
+		backgroundColor: "#fff",
 		borderTopWidth: 1,
-		borderTopColor: "#ccc",
+		borderColor: "#ddd",
 	},
 	navItem: {
 		alignItems: "center",
-		width: (width - 70) / 4 - 5,
+	},
+	navIcon: {
+		width: 24,
+		height: 24,
+		resizeMode: "contain",
+		marginBottom: 4,
 	},
 	navLabel: {
 		fontSize: 12,
-		marginTop: 3,
-		color: "black",
-		textAlign: "center",
-	},
-	navIcon: {
-		width: 26,
-		height: 26,
-		tintColor: "black",
+		color: "#444",
 	},
 	fabButtonContainer: {
-		width: 70,
-		height: 70,
-		borderRadius: 35,
-		backgroundColor: "white",
-		justifyContent: "center",
-		alignItems: "center",
-		marginTop: -30,
-		shadowColor: "#000",
-		shadowOpacity: 0.2,
-		shadowRadius: 6,
-		elevation: 4,
+		position: "relative",
+		bottom: 15,
 	},
 	fabButton: {
-		backgroundColor: "#A1B97A",
-		width: 70,
-		height: 70,
-		borderRadius: 35,
+		backgroundColor: "#6CC551",
+		width: 55,
+		height: 55,
+		borderRadius: 27.5,
+		alignItems: "center",
+		justifyContent: "center",
+		shadowColor: "#000",
+		shadowOpacity: 0.3,
+		shadowRadius: 3,
+		elevation: 5,
+	},
+	fabText: {
+		color: "#fff",
+		fontSize: 32,
+		lineHeight: 32,
+		fontWeight: "bold",
+	},
+	modalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.3)",
+		justifyContent: "center",
+		alignItems: "center",
+		paddingHorizontal: 15,
+	},
+	modalContainer: {
+		backgroundColor: "#fff",
+		borderRadius: 10,
+		padding: 20,
+		width: "100%",
+		maxWidth: 400,
+	},
+	modalTitle: {
+		fontSize: 20,
+		fontWeight: "bold",
+		marginBottom: 15,
+		textAlign: "center",
+	},
+	textInput: {
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 8,
+		padding: 10,
+		marginBottom: 20,
+		fontSize: 16,
+	},
+	modalButtons: {
+		flexDirection: "row",
+		justifyContent: "space-between",
+	},
+	cancelButton: {
+		padding: 12,
+		borderRadius: 8,
+		backgroundColor: "#ddd",
+		flex: 1,
+		marginRight: 10,
+		alignItems: "center",
+	},
+	confirmButton: {
+		padding: 12,
+		borderRadius: 8,
+		flex: 1,
+		alignItems: "center",
+	},
+	avatarModalContainer: {
+		backgroundColor: "#fff",
+		borderRadius: 10,
+		padding: 20,
+		width: "100%",
+		maxWidth: 400,
+		alignItems: "center",
+	},
+	avatarItem: {
+		padding: 10,
+		marginHorizontal: 5,
+		borderRadius: 10,
 		justifyContent: "center",
 		alignItems: "center",
 	},
-	fabText: {
-		fontSize: 34,
-		color: "black",
+	uploadButton: {
+		marginTop: 20,
+		padding: 12,
+		backgroundColor: "#D9D9D9",
+		borderRadius: 8,
+		alignItems: "center",
+		width: "100%",
+	},
+	genderOption: {
+		padding: 12,
+		marginBottom: 10,
+		borderRadius: 8,
+		alignItems: "center",
+		backgroundColor: "#eee",
 	},
 });
